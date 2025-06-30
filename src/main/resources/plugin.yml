@@ -1,6 +1,11 @@
 name: BPEconomy
 version: '1.0-SNAPSHOT'
-main: com.trynocs.bPEconomy.main
+main: com.trynocs.bPEconomy.Main
 api-version: '1.21'
 prefix: BPUtils
 authors: [ Trynocs ]
+commands:
+  jobs:
+    description: Manage your job and view job information.
+    usage: /<command> [subcommand] [args]
+    aliases: [job]
