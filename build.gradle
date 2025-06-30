@@ -42,6 +42,7 @@ repositories {
 dependencies {
     compileOnly("org.spigotmc:spigot-api:1.21.1-R0.1-SNAPSHOT")
 
+<<<<<<< HEAD
     // LuckPerms API
     compileOnly("net.luckperms:api:5.4")
 
@@ -58,9 +59,21 @@ dependencies {
 shadowJar {
     relocate 'co.aikar.commands', 'com.trynocs.bPEconomy.acf'
     relocate 'co.aikar.locales', 'com.trynocs.bPEconomy.locales'
+=======
+    // Test dependencies
+    testImplementation(platform("org.junit:junit-bom:5.10.0"))
+    testImplementation("org.junit.jupiter:junit-jupiter")
+>>>>>>> origin/feature/initial-economy-and-jobs
 }
 
 tasks {
+    test {
+        useJUnitPlatform()
+        testLogging {
+            events "passed", "skipped", "failed"
+        }
+    }
+
     runServer {
         // Configure the Minecraft version for our task.
         // This is the only required configuration besides applying the plugin.

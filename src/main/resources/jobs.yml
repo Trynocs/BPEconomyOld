@@ -1,0 +1,27 @@
+# Define jobs here
+#
+# HINWEIS FÜR ADMINISTRATOREN:
+# Achten Sie auf eine sorgfältige Balance der Belohnungen, um die Serverwirtschaft nicht zu gefährden.
+# Insbesondere das Belohnen von Blöcken, die von Spielern leicht platziert und wieder abgebaut werden können
+# (z.B. Erze aus Silk Touch, Holz), kann zu Exploits führen, wenn die Belohnungen zu hoch sind.
+# Erwägen Sie, für solche Aktionen keine oder nur sehr geringe Belohnungen festzulegen,
+# oder warten Sie auf zukünftige Plugin-Versionen, die spielerplatzierte Blöcke besser erkennen können.
+#
+# Example:
+# Miner:
+#   description: "Mine ores and stone to earn money."
+#   actions:
+#     STONE: 0.10 # Reward for breaking STONE
+#     COAL_ORE: 0.50
+#     IRON_ORE: 1.00
+#     GOLD_ORE: 2.00
+#     DIAMOND_ORE: 5.00
+# Woodcutter:
+#   description: "Cut down trees to earn money."
+#   actions:
+#     OAK_LOG: 0.25
+#     SPRUCE_LOG: 0.25
+#     BIRCH_LOG: 0.25
+#     JUNGLE_LOG: 0.30
+#     ACACIA_LOG: 0.30
+#     DARK_OAK_LOG: 0.30
