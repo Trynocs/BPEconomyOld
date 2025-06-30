@@ -2,10 +2,15 @@ name: BPEconomy
 version: '1.0-SNAPSHOT'
 main: com.trynocs.bPEconomy.Main
 api-version: '1.21'
-prefix: BPUtils
+prefix: BPEconomy
 authors: [ Trynocs ]
+<<<<<<< HEAD
+depend: [ TryLibs, Vault ]
+loadbefore: [ Perks, EditEffect ]
+=======
 commands:
   jobs:
     description: Manage your job and view job information.
     usage: /<command> [subcommand] [args]
     aliases: [job]
+>>>>>>> origin/feature/initial-economy-and-jobs
