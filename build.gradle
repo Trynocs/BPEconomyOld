@@ -1,5 +1,4 @@
 plugins {
-    id 'com.gradleup.shadow' version '8.3.0'
     id 'java'
     id("xyz.jpenilla.run-paper") version "2.3.1"
 }
@@ -17,53 +16,14 @@ repositories {
         name = "sonatype"
         url = "https://oss.sonatype.org/content/groups/public/"
     }
-    // LuckPerms repository
-    maven {
-        name = "luckperms"
-        url = "https://repo.lucko.me/"
-    }
-    // ACF (Aikar Commands Framework)
-    maven {
-        name = "aikar"
-        url = "https://repo.aikar.co/content/groups/aikar/"
-    }
-    // PaperMC repository
-    maven {
-        name = "papermc"
-        url = "https://repo.papermc.io/repository/maven-public/"
-    }
-    // JitPack for TryLibs
-    maven {
-        name = "jitpack"
-        url = "https://jitpack.io"
-    }
 }
 
 dependencies {
     compileOnly("org.spigotmc:spigot-api:1.21.1-R0.1-SNAPSHOT")
 
-<<<<<<< HEAD
-    // LuckPerms API
-    compileOnly("net.luckperms:api:5.4")
-
-    // Vault API
-    compileOnly("com.github.MilkBowl:VaultAPI:1.7")
-
-    // Aikar's Command Framework
-    implementation("co.aikar:acf-paper:0.5.1-SNAPSHOT")
-
-    // TryLibs dependency from JitPack with specific commit
-    compileOnly("com.trynocs:TryLibs:1.0")
-}
-
-shadowJar {
-    relocate 'co.aikar.commands', 'com.trynocs.bPEconomy.acf'
-    relocate 'co.aikar.locales', 'com.trynocs.bPEconomy.locales'
-=======
     // Test dependencies
     testImplementation(platform("org.junit:junit-bom:5.10.0"))
     testImplementation("org.junit.jupiter:junit-jupiter")
->>>>>>> origin/feature/initial-economy-and-jobs
 }
 
 tasks {
@@ -108,5 +68,3 @@ processResources {
         expand props
     }
 }
-
-build.dependsOn shadowJar
