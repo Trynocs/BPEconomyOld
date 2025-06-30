@@ -2,5 +2,7 @@ name: BPEconomy
 version: '1.0-SNAPSHOT'
 main: com.trynocs.bPEconomy.main
 api-version: '1.21'
-prefix: BPUtils
+prefix: BPEconomy
 authors: [ Trynocs ]
+depend: [ TryLibs, Vault ]
+loadbefore: [ Perks, EditEffect ]
