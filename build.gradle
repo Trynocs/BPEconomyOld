@@ -20,6 +20,7 @@ repositories {
 
 dependencies {
     compileOnly("org.spigotmc:spigot-api:1.21.1-R0.1-SNAPSHOT")
+    implementation("com.trynocs:trylibs:1.0.0") // Added TryLibs
 
     // Test dependencies
     testImplementation(platform("org.junit:junit-bom:5.10.0"))

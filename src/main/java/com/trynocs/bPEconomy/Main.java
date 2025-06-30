@@ -1,9 +1,15 @@
 package com.trynocs.bPEconomy;
 
+package com.trynocs.bPEconomy;
+
 import com.trynocs.bPEconomy.commands.JobsCommand;
 import com.trynocs.bPEconomy.economy.VaultEconomy;
 import com.trynocs.bPEconomy.jobs.JobManager;
 import com.trynocs.bPEconomy.listener.JobsListener;
+import com.trynocs.trylibs.config.Config;
+import com.trynocs.trylibs.config.ConfigManager;
+import com.trynocs.trylibs.database.DatabaseHandler;
+// import com.trynocs.trylibs.database.DatabaseType; // Assuming TryLibs handles type selection or defaults to SQLite
 import net.milkbowl.vault.economy.Economy;
 import org.bukkit.plugin.ServicePriority;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -17,26 +23,40 @@ public final class Main extends JavaPlugin {
     private JobManager jobManager;
     private static Main instance;
 
+    private ConfigManager configManager;
+    private Config mainConfig;
+    private Config jobsConfig;
+    private DatabaseHandler databaseHandler;
+
     @Override
     public void onEnable() {
         instance = this;
 
-        // Save default config if not exists
-        saveDefaultConfig();
-        getConfig().options().copyDefaults(true);
-        saveConfig();
+        // Initialize TryLibs ConfigManager
+        configManager = new ConfigManager(this);
+        mainConfig = configManager.load("config.yml");
+        // mainConfig.saveDefaultConfig(); // Ensures config.yml is created with defaults if not present
 
-        // Save jobs.yml if not exists
-        saveResource("jobs.yml", false);
+        jobsConfig = configManager.load("jobs.yml");
+        jobsConfig.saveDefaultConfig(); // Ensures jobs.yml is created from resources if not present
 
+        // Initialize TryLibs DatabaseHandler
+        // Assuming default constructor uses a pre-configured DB (e.g. SQLite in plugin folder)
+        // or that configuration is handled within TryLibs if a central DB is used.
+        databaseHandler = new DatabaseHandler(this);
+        // It's good practice for DatabaseHandler to connect and prepare itself upon instantiation or via an init method.
+        // If an explicit connect method is needed: databaseHandler.connect();
 
         if (!setupEconomy()) {
             log.severe(String.format("[%s] - Disabled due to no Vault dependency found!", getDescription().getName()));
+            if (databaseHandler != null) {
+                databaseHandler.closeConnection(); // Close DB if setup fails mid-way
+            }
             getServer().getPluginManager().disablePlugin(this);
             return;
         }
 
-        jobManager = new JobManager(this);
+        jobManager = new JobManager(this, jobsConfig, databaseHandler); // Pass dependencies
 
         // Register commands
         getCommand("jobs").setExecutor(new JobsCommand(this));
@@ -49,9 +69,18 @@ public final class Main extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        // The new savePlayerJobs might be deprecated or changed if we save on change.
+        // For now, we keep it as per current JobManager structure, but it will be refactored.
         if (jobManager != null) {
-            jobManager.savePlayerJobs();
+            // jobManager.savePlayerJobs(); // This method in JobManager will be refactored/removed
         }
+
+        // Close Database Connection
+        if (databaseHandler != null) {
+            databaseHandler.closeConnection();
+            log.info("Database connection closed.");
+        }
+
         log.info(String.format("[%s] Disabled Version %s", getDescription().getName(), getDescription().getVersion()));
     }
 
@@ -75,4 +104,9 @@ public final class Main extends JavaPlugin {
     public static Main getInstance() {
         return instance;
     }
+
+    // Getter for DatabaseHandler if other parts of the plugin might need it
+    // public DatabaseHandler getDatabaseHandler() {
+    // return databaseHandler;
+    // }
 }

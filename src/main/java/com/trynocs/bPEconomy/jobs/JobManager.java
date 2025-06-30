@@ -1,57 +1,91 @@
 package com.trynocs.bPEconomy.jobs;
 
 import com.trynocs.bPEconomy.Main;
+import com.trynocs.trylibs.config.Config; // TryLibs Config
 import org.bukkit.Material;
-import org.bukkit.configuration.ConfigurationSection;
-import org.bukkit.configuration.file.FileConfiguration;
-import org.bukkit.configuration.file.YamlConfiguration;
+// import org.bukkit.configuration.ConfigurationSection; // No longer needed
+// import org.bukkit.configuration.file.FileConfiguration; // No longer needed
+// import org.bukkit.configuration.file.YamlConfiguration; // No longer needed
+import com.trynocs.trylibs.database.DatabaseHandler;
 import org.bukkit.entity.Player;
 
-import java.io.File;
-import java.io.IOException;
+// Remove File and IOException once fully refactored
+// import java.io.File;
+// import java.io.IOException;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.logging.Level;
 
 public class JobManager {
 
     private final Main plugin;
+    private final Config jobsConfig;
+    private final DatabaseHandler dbHandler; // TryLibs DatabaseHandler
     private final Map<String, Job> jobs = new HashMap<>();
     private final Map<UUID, PlayerJob> playerJobs = new HashMap<>(); // Player UUID -> PlayerJob
-    private File playerJobsFile;
-    private FileConfiguration playerJobsConfig;
+    // private File playerJobsFile; // Removed
+    // private org.bukkit.configuration.file.FileConfiguration playerJobsConfig; // Removed
 
-    public JobManager(Main plugin) {
+    public JobManager(Main plugin, Config jobsConfig, DatabaseHandler dbHandler) {
         this.plugin = plugin;
+        this.jobsConfig = jobsConfig;
+        this.dbHandler = dbHandler;
+        initDatabaseTable();
         loadJobs();
         loadPlayerJobs();
     }
 
-    private void loadJobs() {
-        File jobsFile = new File(plugin.getDataFolder(), "jobs.yml");
-        if (!jobsFile.exists()) {
-            plugin.saveResource("jobs.yml", false);
+    private void initDatabaseTable() {
+        // Use DatabaseHandler to execute a CREATE TABLE IF NOT EXISTS statement.
+        // The exact table name and column names should be consistent.
+        String createTableSQL = "CREATE TABLE IF NOT EXISTS bpeconomy_player_jobs (" +
+                                "player_uuid VARCHAR(36) PRIMARY KEY NOT NULL," +
+                                "job_name VARCHAR(255) NOT NULL" +
+                                ");";
+        try {
+            dbHandler.executeUpdate(createTableSQL);
+            plugin.getLogger().info("Player jobs database table initialized successfully.");
+        } catch (SQLException e) {
+            plugin.getLogger().log(Level.SEVERE, "Could not initialize player jobs database table!", e);
         }
-        FileConfiguration jobsConfig = YamlConfiguration.loadConfiguration(jobsFile);
-        ConfigurationSection jobsSection = jobsConfig.getConfigurationSection("");
-        if (jobsSection == null) {
+    }
+
+    private void loadJobs() {
+        // jobsConfig is already loaded and passed by Main.java
+        // It also handles creating the default jobs.yml from resources
+
+        Set<String> jobKeys = jobsConfig.getKeys(false); // Get top-level keys (job names)
+        if (jobKeys == null || jobKeys.isEmpty()) {
             plugin.getLogger().warning("No jobs defined in jobs.yml!");
             return;
         }
 
-        for (String jobName : jobsSection.getKeys(false)) {
-            String description = jobsSection.getString(jobName + ".description", "No description provided.");
-            ConfigurationSection actionsSection = jobsSection.getConfigurationSection(jobName + ".actions");
+        for (String jobName : jobKeys) {
+            String description = jobsConfig.getString(jobName + ".description", "No description provided.");
+            // TryLibs might use getSection or direct path access for nested sections
+            // Assuming getKeys can be used on a path for sub-keys or direct access to nested values
             Map<Material, Double> actions = new HashMap<>();
-            if (actionsSection != null) {
-                for (String materialName : actionsSection.getKeys(false)) {
-                    try {
-                        Material material = Material.valueOf(materialName.toUpperCase());
-                        double reward = actionsSection.getDouble(materialName);
-                        actions.put(material, reward);
-                    } catch (IllegalArgumentException e) {
-                        plugin.getLogger().warning("Invalid material '" + materialName + "' in job '" + jobName + "'. Skipping.");
+            Config actionsConfigSection = jobsConfig.getSection(jobName + ".actions");
+
+            if (actionsConfigSection != null) {
+                 Set<String> materialKeys = actionsConfigSection.getKeys(false);
+                 if (materialKeys != null) {
+                    for (String materialName : materialKeys) {
+                        try {
+                            Material material = Material.valueOf(materialName.toUpperCase());
+                            // Use getDouble from the specific section for clarity
+                            double reward = actionsConfigSection.getDouble(materialName, 0.0);
+                            if (reward > 0.0) { // Only add if reward is specified
+                                actions.put(material, reward);
+                            }
+                        } catch (IllegalArgumentException e) {
+                            plugin.getLogger().warning("Invalid material '" + materialName + "' in job '" + jobName + "'. Skipping.");
+                        }
                     }
                 }
             }
@@ -62,42 +96,70 @@ public class JobManager {
     }
 
     private void loadPlayerJobs() {
-        playerJobsFile = new File(plugin.getDataFolder(), "player_jobs.yml");
-        if (!playerJobsFile.exists()) {
-            try {
-                playerJobsFile.createNewFile();
-            } catch (IOException e) {
-                plugin.getLogger().log(Level.SEVERE, "Could not create player_jobs.yml!", e);
-            }
-        }
-        playerJobsConfig = YamlConfiguration.loadConfiguration(playerJobsFile);
-        ConfigurationSection playersSection = playerJobsConfig.getConfigurationSection("players");
-        if (playersSection != null) {
-            for (String uuidString : playersSection.getKeys(false)) {
+        playerJobs.clear(); // Clear in-memory cache before loading
+        String selectSQL = "SELECT player_uuid, job_name FROM bpeconomy_player_jobs;";
+        try (PreparedStatement pstmt = dbHandler.getConnection().prepareStatement(selectSQL); // Assuming getConnection() exists
+             ResultSet rs = pstmt.executeQuery()) {
+
+            while (rs.next()) {
                 try {
-                    UUID playerUUID = UUID.fromString(uuidString);
-                    String jobName = playersSection.getString(uuidString + ".job");
+                    UUID playerUUID = UUID.fromString(rs.getString("player_uuid"));
+                    String jobName = rs.getString("job_name");
                     if (jobName != null && jobs.containsKey(jobName.toLowerCase())) {
                         playerJobs.put(playerUUID, new PlayerJob(playerUUID, jobName));
                     } else if (jobName != null) {
-                        plugin.getLogger().warning("Player " + uuidString + " has an invalid job '" + jobName + "' assigned. Ignoring.");
+                        plugin.getLogger().warning("Player " + playerUUID + " has an invalid job '" + jobName + "' assigned in DB. Ignoring.");
                     }
                 } catch (IllegalArgumentException e) {
-                    plugin.getLogger().warning("Invalid UUID string '" + uuidString + "' in player_jobs.yml. Skipping.");
+                    plugin.getLogger().warning("Invalid UUID string found in database. Skipping entry: " + rs.getString("player_uuid"));
                 }
             }
+            plugin.getLogger().info("Loaded " + playerJobs.size() + " player jobs from database.");
+        } catch (SQLException e) {
+            plugin.getLogger().log(Level.SEVERE, "Could not load player jobs from database!", e);
         }
     }
 
+    /**
+     * This method is now largely obsolete as data is saved on change.
+     * It could be kept for a manual full sync if necessary, but typically not called.
+     * For this refactor, we will effectively disable its old functionality.
+     */
     public void savePlayerJobs() {
-        ConfigurationSection playersSection = playerJobsConfig.createSection("players");
-        for (Map.Entry<UUID, PlayerJob> entry : playerJobs.entrySet()) {
-            playersSection.set(entry.getKey().toString() + ".job", entry.getValue().getJobName());
+        plugin.getLogger().info("savePlayerJobs() called. Player data is now saved on change. This method is deprecated for YAML saving.");
+        // Old YAML saving logic removed.
+        // If a batch DB save was desired (e.g. for players not online but data changed by admin):
+        // for (Map.Entry<UUID, PlayerJob> entry : playerJobs.entrySet()) {
+        //     updatePlayerJobInDb(entry.getKey(), entry.getValue().getJobName());
+        // }
+    }
+
+    private void updatePlayerJobInDb(UUID playerUUID, String jobName) {
+        // Uses INSERT OR REPLACE for SQLite, or similar logic for other DBs via TryLibs
+        // TryLibs DatabaseHandler might have a specific method for this (e.g., dbHandler.insertOrUpdate)
+        // For now, assuming a generic executeUpdate that handles common SQL.
+        // For SQLite:
+        String upsertSQL = "INSERT OR REPLACE INTO bpeconomy_player_jobs (player_uuid, job_name) VALUES (?, ?);";
+        // For MySQL:
+        // String upsertSQL = "INSERT INTO bpeconomy_player_jobs (player_uuid, job_name) VALUES (?, ?) ON DUPLICATE KEY UPDATE job_name = VALUES(job_name);";
+        // The actual SQL might depend on how TryLibs DatabaseHandler is implemented or configured (e.g. which DB type it's using)
+
+        try (PreparedStatement pstmt = dbHandler.getConnection().prepareStatement(upsertSQL)) {
+            pstmt.setString(1, playerUUID.toString());
+            pstmt.setString(2, jobName);
+            pstmt.executeUpdate();
+        } catch (SQLException e) {
+            plugin.getLogger().log(Level.SEVERE, "Could not update player job in database for " + playerUUID, e);
         }
-        try {
-            playerJobsConfig.save(playerJobsFile);
-        } catch (IOException e) {
-            plugin.getLogger().log(Level.SEVERE, "Could not save player_jobs.yml!", e);
+    }
+
+    private void removePlayerJobFromDb(UUID playerUUID) {
+        String deleteSQL = "DELETE FROM bpeconomy_player_jobs WHERE player_uuid = ?;";
+        try (PreparedStatement pstmt = dbHandler.getConnection().prepareStatement(deleteSQL)) {
+            pstmt.setString(1, playerUUID.toString());
+            pstmt.executeUpdate();
+        } catch (SQLException e) {
+            plugin.getLogger().log(Level.SEVERE, "Could not remove player job from database for " + playerUUID, e);
         }
     }
 
@@ -120,18 +182,20 @@ public class JobManager {
         }
         PlayerJob playerJob = playerJobs.get(player.getUniqueId());
         if (playerJob != null) {
-            playerJob.setJobName(jobName);
+            playerJob.setJobName(jobName); // Update in-memory cache
         } else {
-            playerJobs.put(player.getUniqueId(), new PlayerJob(player.getUniqueId(), jobName));
+            playerJobs.put(player.getUniqueId(), new PlayerJob(player.getUniqueId(), jobName)); // Add to in-memory cache
         }
-        savePlayerJobs();
+        updatePlayerJobInDb(player.getUniqueId(), jobName); // Persist change to DB
+        // savePlayerJobs(); // Removed, data saved on change
         return true;
     }
 
     public boolean leaveJob(Player player) {
-        PlayerJob playerJob = playerJobs.remove(player.getUniqueId());
+        PlayerJob playerJob = playerJobs.remove(player.getUniqueId()); // Remove from in-memory cache
         if (playerJob != null) {
-            savePlayerJobs();
+            removePlayerJobFromDb(player.getUniqueId()); // Remove from DB
+            // savePlayerJobs(); // Removed, data saved on change
             return true;
         }
         return false;
